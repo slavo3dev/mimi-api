@@ -1,11 +1,11 @@
 import express, { Request, Response } from 'express';
-import userRoutes from './routes/userRoutes'
+import videoRoutes from './routes/videoRoutes'
 
 const app = express();
 
 app.use(express.json());
 
-app.use("/users", userRoutes)
+app.use('/videos', videoRoutes);
 
 app.get('/', (_req: Request, res: Response) => {
   res.send('Hello World MimiKa Server');
