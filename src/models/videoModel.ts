@@ -1,78 +1,72 @@
-import { v4 as uuidv4 } from 'uuid';
-
-export type MimiNote = {
-  id: string;
-  time: number;
-  text: string;
-  videoId: string;
-  createdAt: number;
-};
-
-export type MimiVideoData = {
-  title: string;
-  notes: MimiNote[];
-};
+import { supabase } from '../lib/supabaseClient';
 
 export class VideoModel {
-  private static videos: Record<string, MimiVideoData> = {};
-
-  static getAllVideos(): Record<string, MimiVideoData> {
-    return this.videos;
+  static async getAllVideos() {
+    const { data, error } = await supabase
+      .from('videos')
+      .select('id, title, created_at, notes (id, text, time, created_at)');
+    if (error) throw error;
+    return data;
   }
 
-  static getVideo(videoId: string): MimiVideoData | null {
-    return this.videos[videoId] ?? null;
+  static async getVideo(videoId: string) {
+    const { data, error } = await supabase
+      .from('videos')
+      .select('id, title, created_at, notes (id, text, time, created_at)')
+      .eq('id', videoId)
+      .single();
+    if (error) return null;
+    return data;
   }
 
-  static addNote(videoId: string, text: string, time: number): MimiNote {
-    const note: MimiNote = {
-      id: uuidv4(),
-      text,
-      time,
-      videoId,
-      createdAt: Date.now(),
-    };
+  static async addNote(videoId: string, text: string, time: number) {
+    // If video doesn’t exist, create it
+    let { data: video } = await supabase
+      .from('videos')
+      .select('id')
+      .eq('id', videoId)
+      .single();
 
-    if (!this.videos[videoId]) {
-      this.videos[videoId] = { title: '', notes: [] };
+    if (!video) {
+      const { data: newVideo, error: videoError } = await supabase
+        .from('videos')
+        .insert([{ id: videoId, title: '' }])
+        .select()
+        .single();
+      if (videoError) throw videoError;
+      video = newVideo;
     }
 
-    this.videos[videoId].notes.push(note);
+    // Insert note
+    const { data: note, error } = await supabase
+      .from('notes')
+      .insert([{ video_id: video?.id, text, time }])
+      .select()
+      .single();
+
+    if (error) throw error;
     return note;
   }
 
-  static updateNote(videoId: string, noteId: string, text: string, time: number): MimiNote | null {
-    const video = this.videos[videoId];
-    if (!video) return null;
+  static async updateNote(noteId: string, text: string, time: number) {
+    const { data, error } = await supabase
+      .from('notes')
+      .update({ text, time })
+      .eq('id', noteId)
+      .select()
+      .single();
 
-    const note = video.notes.find((n) => n.id === noteId);
-    if (!note) return null;
-
-    note.text = text;
-    note.time = time;
-    return note;
+    if (error) return null;
+    return data;
   }
 
-  static deleteNote(videoId: string, noteId: string): boolean {
-    const video = this.videos[videoId];
-    if (!video) return false;
-
-    const index = video.notes.findIndex((n) => n.id === noteId);
-    if (index === -1) return false;
-
-    video.notes.splice(index, 1);
-
-    // Remove video if no notes left
-    if (video.notes.length === 0) {
-      delete this.videos[videoId];
-    }
-
-    return true;
+  static async deleteNote(noteId: string) {
+    const { error } = await supabase.from('notes').delete().eq('id', noteId);
+    return !error;
   }
 
-  static deleteVideo(videoId: string): boolean {
-    if (!this.videos[videoId]) return false;
-    delete this.videos[videoId];
-    return true;
+  static async deleteVideo(videoId: string) {
+    const { error } = await supabase.from('videos').delete().eq('id', videoId);
+    return !error;
   }
 }
