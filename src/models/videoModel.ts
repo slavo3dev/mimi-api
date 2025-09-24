@@ -1,46 +1,70 @@
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from "../lib/supabaseClient";
+
+export type MimiNote = {
+  id: string;
+  video_id: string;
+  text: string;
+  time: number;
+  created_at: string;
+  user_id: string;
+};
+
+export type MimiVideoData = {
+  id: string;
+  title: string;
+  user_id: string;
+  created_at: string;
+  notes?: MimiNote[];
+};
 
 export class VideoModel {
-  static async getAllVideos() {
+  // ✅ Get all videos for a user
+  static async getAllVideos(userId: string): Promise<MimiVideoData[]> {
     const { data, error } = await supabase
-      .from('videos')
-      .select('id, title, created_at, notes (id, text, time, created_at)');
+      .from("videos")
+      .select("*, notes(*)")
+      .eq("user_id", userId);
+
     if (error) throw error;
-    return data;
+    return data || [];
   }
 
-  static async getVideo(videoId: string) {
+  // ✅ Get a single video with notes (owned by user)
+  static async getVideo(videoId: string, userId: string): Promise<MimiVideoData | null> {
     const { data, error } = await supabase
-      .from('videos')
-      .select('id, title, created_at, notes (id, text, time, created_at)')
-      .eq('id', videoId)
+      .from("videos")
+      .select("*, notes(*)")
+      .eq("id", videoId)
+      .eq("user_id", userId)
       .single();
-    if (error) return null;
-    return data;
+
+    if (error && error.code !== "PGRST116") throw error; // "not found"
+    return data || null;
   }
 
-  static async addNote(videoId: string, text: string, time: number) {
-    // If video doesn’t exist, create it
-    let { data: video } = await supabase
-      .from('videos')
-      .select('id')
-      .eq('id', videoId)
+  // ✅ Add a note to a video (creates video if not exists)
+  static async addNote(videoId: string, text: string, time: number, userId: string): Promise<MimiNote> {
+    // Ensure video exists
+    const { data: video, error: videoError } = await supabase
+      .from("videos")
+      .select("id")
+      .eq("id", videoId)
+      .eq("user_id", userId)
       .single();
 
-    if (!video) {
-      const { data: newVideo, error: videoError } = await supabase
-        .from('videos')
-        .insert([{ id: videoId, title: '' }])
-        .select()
-        .single();
-      if (videoError) throw videoError;
-      video = newVideo;
+    if (videoError && videoError.code === "PGRST116") {
+      // If video not found, create it
+      const { error: insertError } = await supabase
+        .from("videos")
+        .insert({ id: videoId, title: "", user_id: userId });
+
+      if (insertError) throw insertError;
     }
 
     // Insert note
     const { data: note, error } = await supabase
-      .from('notes')
-      .insert([{ video_id: video?.id, text, time }])
+      .from("notes")
+      .insert({ video_id: videoId, text, time, user_id: userId })
       .select()
       .single();
 
@@ -48,25 +72,43 @@ export class VideoModel {
     return note;
   }
 
-  static async updateNote(noteId: string, text: string, time: number) {
+  // ✅ Update a note (only if user owns it)
+  static async updateNote(videoId: string, noteId: string, text: string, time: number, userId: string): Promise<MimiNote | null> {
     const { data, error } = await supabase
-      .from('notes')
+      .from("notes")
       .update({ text, time })
-      .eq('id', noteId)
+      .eq("id", noteId)
+      .eq("video_id", videoId)
+      .eq("user_id", userId)
       .select()
       .single();
 
-    if (error) return null;
-    return data;
+    if (error && error.code !== "PGRST116") throw error;
+    return data || null;
   }
 
-  static async deleteNote(noteId: string) {
-    const { error } = await supabase.from('notes').delete().eq('id', noteId);
-    return !error;
+  // ✅ Delete a note (only if user owns it)
+  static async deleteNote(videoId: string, noteId: string, userId: string): Promise<boolean> {
+    const { error } = await supabase
+      .from("notes")
+      .delete()
+      .eq("id", noteId)
+      .eq("video_id", videoId)
+      .eq("user_id", userId);
+
+    if (error) throw error;
+    return true;
   }
 
-  static async deleteVideo(videoId: string) {
-    const { error } = await supabase.from('videos').delete().eq('id', videoId);
-    return !error;
+  // ✅ Delete a video (and cascade its notes if configured)
+  static async deleteVideo(videoId: string, userId: string): Promise<boolean> {
+    const { error } = await supabase
+      .from("videos")
+      .delete()
+      .eq("id", videoId)
+      .eq("user_id", userId);
+
+    if (error) throw error;
+    return true;
   }
 }

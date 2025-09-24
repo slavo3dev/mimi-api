@@ -1,7 +1,10 @@
 import { Router } from "express";
 import { VideoController } from "../controllers/VideoController";
+import { authenticateUser } from "../middleware/authMiddleware";
 
 const router = Router()
+
+router.use(authenticateUser);
 
 router.get('/', VideoController.getAll);
 router.get('/:videoId', VideoController.getVideo);
