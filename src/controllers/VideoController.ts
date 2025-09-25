@@ -5,8 +5,8 @@ export class VideoController {
   // Get all videos for the authenticated user
   static getAll = async (req: Request, res: Response) => {
     try {
-      const userId = (req as any).user.id;
-      const videos = await VideoModel.getAllVideos(userId);
+      if (!req.user) return res.status(401).json({ error: "Unauthorized" });
+      const videos = await VideoModel.getAllVideos(req.user.id);
       res.json(videos);
     } catch (err) {
       console.error("Error fetching videos:", err);
@@ -17,10 +17,10 @@ export class VideoController {
   // Get one video with notes
   static getVideo = async (req: Request, res: Response) => {
     try {
-      const userId = (req as any).user.id;
+      if (!req.user) return res.status(401).json({ error: "Unauthorized" });
       const { videoId } = req.params;
 
-      const video = await VideoModel.getVideo(videoId, userId);
+      const video = await VideoModel.getVideo(videoId, req.user.id);
       if (!video) return res.status(404).json({ error: "Video not found" });
 
       res.json(video);
@@ -33,7 +33,7 @@ export class VideoController {
   // Add a note (creates video if it doesn’t exist yet)
   static addNote = async (req: Request, res: Response) => {
     try {
-      const userId = (req as any).user.id;
+      if (!req.user) return res.status(401).json({ error: "Unauthorized" });
       const { videoId } = req.params;
       const { text, time } = req.body;
 
@@ -41,8 +41,8 @@ export class VideoController {
         return res.status(400).json({ error: "text and time are required" });
       }
 
-      const note = await VideoModel.addNote(videoId, text, time, userId);
-      res.json(note);
+      const note = await VideoModel.addNote(videoId, text, time, req.user.id);
+      res.status(201).json(note);
     } catch (err) {
       console.error("Error adding note:", err);
       res.status(500).json({ error: "Failed to add note" });
@@ -52,7 +52,7 @@ export class VideoController {
   // Update a note
   static updateNote = async (req: Request, res: Response) => {
     try {
-      const userId = (req as any).user.id;
+      if (!req.user) return res.status(401).json({ error: "Unauthorized" });
       const { videoId, noteId } = req.params;
       const { text, time } = req.body;
 
@@ -60,7 +60,7 @@ export class VideoController {
         return res.status(400).json({ error: "text and time are required" });
       }
 
-      const note = await VideoModel.updateNote(videoId, noteId, text, time, userId);
+      const note = await VideoModel.updateNote(videoId, noteId, text, time, req.user.id);
       if (!note) return res.status(404).json({ error: "Note not found" });
 
       res.json(note);
@@ -73,10 +73,10 @@ export class VideoController {
   // Delete a note
   static deleteNote = async (req: Request, res: Response) => {
     try {
-      const userId = (req as any).user.id;
+      if (!req.user) return res.status(401).json({ error: "Unauthorized" });
       const { videoId, noteId } = req.params;
 
-      const deleted = await VideoModel.deleteNote(videoId, noteId, userId);
+      const deleted = await VideoModel.deleteNote(videoId, noteId, req.user.id);
       if (!deleted) return res.status(404).json({ error: "Note not found" });
 
       res.json({ success: true });
@@ -89,10 +89,10 @@ export class VideoController {
   // Delete a video
   static deleteVideo = async (req: Request, res: Response) => {
     try {
-      const userId = (req as any).user.id;
+      if (!req.user) return res.status(401).json({ error: "Unauthorized" });
       const { videoId } = req.params;
 
-      const deleted = await VideoModel.deleteVideo(videoId, userId);
+      const deleted = await VideoModel.deleteVideo(videoId, req.user.id);
       if (!deleted) return res.status(404).json({ error: "Video not found" });
 
       res.json({ success: true });

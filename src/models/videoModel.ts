@@ -18,18 +18,18 @@ export type MimiVideoData = {
 };
 
 export class VideoModel {
-  // ✅ Get all videos for a user
+  // 🔹 Get all videos with notes for a user
   static async getAllVideos(userId: string): Promise<MimiVideoData[]> {
     const { data, error } = await supabase
       .from("videos")
       .select("*, notes(*)")
       .eq("user_id", userId);
 
-    if (error) throw error;
-    return data || [];
+    if (error) throw new Error(`Error fetching videos: ${error.message}`);
+    return data ?? [];
   }
 
-  // ✅ Get a single video with notes (owned by user)
+  // 🔹 Get a single video with notes (for authenticated user)
   static async getVideo(videoId: string, userId: string): Promise<MimiVideoData | null> {
     const { data, error } = await supabase
       .from("videos")
@@ -38,13 +38,21 @@ export class VideoModel {
       .eq("user_id", userId)
       .single();
 
-    if (error && error.code !== "PGRST116") throw error; // "not found"
-    return data || null;
+    if (error) {
+      if (error.code === "PGRST116") return null; // not found
+      throw new Error(`Error fetching video: ${error.message}`);
+    }
+    return data ?? null;
   }
 
-  // ✅ Add a note to a video (creates video if not exists)
-  static async addNote(videoId: string, text: string, time: number, userId: string): Promise<MimiNote> {
-    // Ensure video exists
+  // 🔹 Add a new note (creates video if missing)
+  static async addNote(
+    videoId: string,
+    text: string,
+    time: number,
+    userId: string
+  ): Promise<MimiNote> {
+    // Ensure video exists (or create it)
     const { data: video, error: videoError } = await supabase
       .from("videos")
       .select("id")
@@ -53,12 +61,13 @@ export class VideoModel {
       .single();
 
     if (videoError && videoError.code === "PGRST116") {
-      // If video not found, create it
       const { error: insertError } = await supabase
         .from("videos")
         .insert({ id: videoId, title: "", user_id: userId });
 
-      if (insertError) throw insertError;
+      if (insertError) throw new Error(`Error creating video: ${insertError.message}`);
+    } else if (videoError) {
+      throw new Error(`Error checking video: ${videoError.message}`);
     }
 
     // Insert note
@@ -68,12 +77,18 @@ export class VideoModel {
       .select()
       .single();
 
-    if (error) throw error;
-    return note;
+    if (error) throw new Error(`Error inserting note: ${error.message}`);
+    return note!;
   }
 
-  // ✅ Update a note (only if user owns it)
-  static async updateNote(videoId: string, noteId: string, text: string, time: number, userId: string): Promise<MimiNote | null> {
+  // 🔹 Update a note (only if owned by user)
+  static async updateNote(
+    videoId: string,
+    noteId: string,
+    text: string,
+    time: number,
+    userId: string
+  ): Promise<MimiNote | null> {
     const { data, error } = await supabase
       .from("notes")
       .update({ text, time })
@@ -83,11 +98,14 @@ export class VideoModel {
       .select()
       .single();
 
-    if (error && error.code !== "PGRST116") throw error;
-    return data || null;
+    if (error) {
+      if (error.code === "PGRST116") return null;
+      throw new Error(`Error updating note: ${error.message}`);
+    }
+    return data ?? null;
   }
 
-  // ✅ Delete a note (only if user owns it)
+  // 🔹 Delete a note
   static async deleteNote(videoId: string, noteId: string, userId: string): Promise<boolean> {
     const { error } = await supabase
       .from("notes")
@@ -96,11 +114,11 @@ export class VideoModel {
       .eq("video_id", videoId)
       .eq("user_id", userId);
 
-    if (error) throw error;
+    if (error) throw new Error(`Error deleting note: ${error.message}`);
     return true;
   }
 
-  // ✅ Delete a video (and cascade its notes if configured)
+  // 🔹 Delete a video (and cascade its notes if configured in DB)
   static async deleteVideo(videoId: string, userId: string): Promise<boolean> {
     const { error } = await supabase
       .from("videos")
@@ -108,7 +126,7 @@ export class VideoModel {
       .eq("id", videoId)
       .eq("user_id", userId);
 
-    if (error) throw error;
+    if (error) throw new Error(`Error deleting video: ${error.message}`);
     return true;
   }
 }
