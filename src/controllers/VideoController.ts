@@ -5,8 +5,8 @@ export class VideoController {
   // Get all videos for the authenticated user
   static getAll = async (req: Request, res: Response) => {
     try {
-      if (!req.user) return res.status(401).json({ error: "Unauthorized" });
-      const videos = await VideoModel.getAllVideos(req.user.id);
+      //if (!req.user) return res.status(401).json({ error: "Unauthorized" });
+      const videos = await VideoModel.getAllVideos();
       res.json(videos);
     } catch (err) {
       console.error("Error fetching videos:", err);

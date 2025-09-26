@@ -19,11 +19,17 @@ export type MimiVideoData = {
 
 export class VideoModel {
   // 🔹 Get all videos with notes for a user
-  static async getAllVideos(userId: string): Promise<MimiVideoData[]> {
-    const { data, error } = await supabase
+  static async getAllVideos(userId?: string): Promise<MimiVideoData[]> {
+    let query = supabase
       .from("videos")
-      .select("*, notes(*)")
-      .eq("user_id", userId);
+      .select("*, notes(*)");
+
+    if (userId) {
+      // if userId is passed → return only user's videos
+      query = query.eq("user_id", userId);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw new Error(`Error fetching videos: ${error.message}`);
     return data ?? [];
