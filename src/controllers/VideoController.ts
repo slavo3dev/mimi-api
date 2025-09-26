@@ -4,6 +4,7 @@ import { VideoModel } from "../models/videoModel";
 export class VideoController {
   // Get all videos for the authenticated user
   static getAll = async (req: Request, res: Response) => {
+    console.log("GET /videos called");
     try {
       //if (!req.user) return res.status(401).json({ error: "Unauthorized" });
       const videos = await VideoModel.getAllVideos();

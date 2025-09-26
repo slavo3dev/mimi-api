@@ -4,6 +4,11 @@ import { supabase } from "../lib/supabaseClient";
 
 export const authenticateUser = async (req: Request, res: Response, next: NextFunction) => {
   try {
+
+    if (req.method === "GET") {
+      return next()
+    }
+
     const authHeader = req.headers.authorization;
     if (!authHeader) return res.status(401).json({ error: "Missing Authorization header" });
 
